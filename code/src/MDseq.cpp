@@ -483,15 +483,15 @@ void computeAccelerations() {
     
     #pragma omp parallel for
     for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
-        #pragma omp parallel for
         for (int j = i+1; j < N; j++) {          
 
             double div=1/(((r[i][0] - r[j][0]) * (r[i][0] - r[j][0]))+((r[i][1] - r[j][1]) * (r[i][1] - r[j][1]))+((r[i][2] - r[j][2]) * (r[i][2] - r[j][2])));
             double p4=div*div*div*div;
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
            double f = (48*p4*div*div*div) - (24*p4);
-                //  from F = ma, where m = 1 in natural units!                
-            #pragma omp atomic
+                //  from F = ma, where m = 1 in natural units!  
+                           
+             #pragma omp atomic
             for (int h = 0; h < 3; h++){    
                 a[i][h] += f*(r[i][h] - r[j][h]);
                 a[j][h] -= f*(r[i][h] - r[j][h]);
