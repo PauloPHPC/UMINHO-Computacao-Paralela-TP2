@@ -491,7 +491,7 @@ void computeAccelerations() {
            double f = (48*p4*div*div*div) - (24*p4);
                 //  from F = ma, where m = 1 in natural units!  
                            
-             #pragma omp atomic
+             
             for (int h = 0; h < 3; h++){    
                 a[i][h] += f*(r[i][h] - r[j][h]);
                 a[j][h] -= f*(r[i][h] - r[j][h]);
@@ -562,7 +562,7 @@ void initializeVelocities() {
     double vCM[3] = {0, 0, 0};
 
 
-    #pragma omp parallel for
+    
     for (i=0; i<N; i++) {   
         #pragma omp parallel for reduction(+:vCM)         
             for(int j=0; j<3; j++){
