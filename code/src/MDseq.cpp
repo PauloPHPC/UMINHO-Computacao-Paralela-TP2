@@ -451,9 +451,9 @@ double Potential() {
     double Pot =0.0;
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
  
-    for (int i=0; i<N; i++) {
+    for (int i=0; i<N/2; i++) {
         #pragma omp parallel for reduction(+:Pot)
-        for (int j=0; j<N; j++) {
+        for (int j=0; j<N/2; j++) {
             
             if (j!=i) {
                 double dx = (r[i][0] - r[j][0]);
@@ -571,16 +571,16 @@ void initializeVelocities() {
     int i;
     
     double vCM[3] = {0, 0, 0};
-    double g=gaussdist();
+   
     #pragma omp critical
     for (i=0; i<N; i++) {
             //  Pull a number from a Gaussian Distribution
-            v[i][0] = g;
-            v[i][1] = g;
-            v[i][2] = g;
-            vCM[0] += m*g;
-            vCM[1] += m*g;
-            vCM[2] += m*g;
+            v[i][0] = gaussdist();
+            v[i][1] = gaussdist();
+            v[i][2] = gaussdist();
+            vCM[0] += m*v[i][0];
+            vCM[1] += m*v[i][1];
+            vCM[2] += m*v[i][2];
 
 
 
