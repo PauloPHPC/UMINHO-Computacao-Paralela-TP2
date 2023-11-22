@@ -451,9 +451,9 @@ double Potential() {
     double Pot =0.0;
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
  
-    for (int i=0; i<N/2; i++) {
+    for (int i=0; i<N; i++) {
         #pragma omp parallel for reduction(+:Pot)
-        for (int j=0; j<N/2; j++) {
+        for (int j=0; j<N; j++) {
             
             if (j!=i) {
                 double dx = (r[i][0] - r[j][0]);
