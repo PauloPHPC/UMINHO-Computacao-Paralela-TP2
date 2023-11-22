@@ -450,19 +450,24 @@ double Kinetic() { //Write Function here!
 double Potential() {
     double Pot =0.0;
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
-    #pragma omp parallel for
-    for (int i=0; i<N; i++) {
-        #pragma omp parallel for reduction(+:Pot) 
-        for (int j=0; j<N; j++) {
+ 
+    for (int i=0; i<N/2; i++) {
+        #pragma omp parallel for reduction(+:Pot)
+        for (int j=0; j<N/2; j++) {
             
             if (j!=i) {
-                double div=1/((((r[i][0] - r[j][0]) * (r[i][0] - r[j][0]))+ ((r[i][1] - r[j][1]) * (r[i][1] - r[j][1])) + ((r[i][2] - r[j][2]) * (r[i][2] - r[j][2])))*(((r[i][0] - r[j][0]) * (r[i][0] - r[j][0]))+ ((r[i][1] - r[j][1]) * (r[i][1] - r[j][1])) + ((r[i][2] - r[j][2]) * (r[i][2] - r[j][2])))*(((r[i][0] - r[j][0]) * (r[i][0] - r[j][0]))+ ((r[i][1] - r[j][1]) * (r[i][1] - r[j][1])) + ((r[i][2] - r[j][2]) * (r[i][2] - r[j][2]))));                
+                double dx = (r[i][0] - r[j][0]);
+                double dy = (r[i][1] - r[j][1]);
+                double dz = (r[i][2] - r[j][2]);
+                double r2 = (dx * dx) + (dy * dy) + (dz * dz);            
+                double r6 = r2*r2*r2;
+                double div=1/r6;                
                 double term = sigma6 * div * (sigma6*div - 1.0);
                 Pot +=  4.0 * epsilon * term;           
             }
         }
     }
-    
+    Pot=2*Pot;
     return Pot;
 }
 
@@ -481,21 +486,27 @@ void computeAccelerations() {
         a[i][2]=0;        
     }
     
-    #pragma omp parallel for
-    for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
-        for (int j = i+1; j < N; j++) {          
 
-            double div=1/(((r[i][0] - r[j][0]) * (r[i][0] - r[j][0]))+((r[i][1] - r[j][1]) * (r[i][1] - r[j][1]))+((r[i][2] - r[j][2]) * (r[i][2] - r[j][2])));
+    for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
+        for (int j = i+1; j < N; j++) {            
+            double rSqd = 0;                      
+            //  component-by-componenent position of i relative to j
+            rij[0] = r[i][0] - r[j][0];
+            rij[1] = r[i][1] - r[j][1];
+            rij[2] = r[i][2] - r[j][2];
+            //  sum of squares of the components
+            rSqd = (rij[0] * rij[0])+(rij[1] * rij[1])+(rij[2] * rij[2]);
+            double div=1/rSqd;
             double p4=div*div*div*div;
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
            double f = (48*p4*div*div*div) - (24*p4);
-                //  from F = ma, where m = 1 in natural units!  
-                           
-             
-            for (int h = 0; h < 3; h++){    
-                a[i][h] += f*(r[i][h] - r[j][h]);
-                a[j][h] -= f*(r[i][h] - r[j][h]);
-            }
+                //  from F = ma, where m = 1 in natural units!                
+                a[i][0] += f*rij[0];
+                a[i][1] += f*rij[1];
+                a[i][2] += f*rij[2];
+                a[j][0] -= f*rij[0];
+                a[j][1] -= f*rij[1];
+                a[j][2] -= f*rij[2];
             
         }
     }
@@ -558,20 +569,25 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
 void initializeVelocities() {
     
     int i;
-    double g=gaussdist();
+    #pragma omp critical
     double vCM[3] = {0, 0, 0};
+    g=gaussdist();
+    for (i=0; i<N; i++) {
+            //  Pull a number from a Gaussian Distribution
+            v[i][0] = g;
+            v[i][1] = g;
+            v[i][2] = g;
+            vCM[0] += m*g;
+            vCM[1] += m*g;
+            vCM[2] += m*g;
 
 
-    
-    for (i=0; i<N; i++) {   
-        #pragma omp parallel for reduction(+:vCM)         
-            for(int j=0; j<3; j++){
-                v[i][j] = g;    
-                vCM[j] += m*g;
-            }
+
     }
     
-    
+    // Vcm = sum_i^N  m*v_i/  sum_i^N  M
+    // Compute center-of-mas velocity according to the formula above
+        
     vCM[0] /= N*m;
     vCM[1] /= N*m;
     vCM[2] /= N*m;
@@ -582,9 +598,9 @@ void initializeVelocities() {
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
-    
     for (i=0; i<N; i++) {
         
+            
             v[i][0] -= vCM[0];
             v[i][1] -= vCM[1];
             v[i][2] -= vCM[2];
@@ -595,12 +611,12 @@ void initializeVelocities() {
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum=0.;
-    #pragma omp parallel for
     for (i=0; i<N; i++) {
-        #pragma omp parallel for reduction(+:vSqdSum) 
-        for(int j=0; j<3; j++){            
-            vSqdSum += v[i][j]*v[i][j];            
-        }
+        
+            
+            vSqdSum += v[i][0]*v[i][0];
+            vSqdSum += v[i][1]*v[i][1];
+            vSqdSum += v[i][2]*v[i][2];
             
         
     }
@@ -608,10 +624,13 @@ void initializeVelocities() {
     lambda = sqrt( 3*(N-1)*Tinit/vSqdSum);
     
     for (i=0; i<N; i++) {
+        
+            
             v[i][0] *= lambda;
             v[i][1] *= lambda;
             v[i][2] *= lambda;
             
+        
     }
 }
 
