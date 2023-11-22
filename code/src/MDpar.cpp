@@ -569,9 +569,10 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
 void initializeVelocities() {
     
     int i;
-    #pragma omp critical
+    
     double vCM[3] = {0, 0, 0};
     double g=gaussdist();
+    #pragma omp critical
     for (i=0; i<N; i++) {
             //  Pull a number from a Gaussian Distribution
             v[i][0] = g;
