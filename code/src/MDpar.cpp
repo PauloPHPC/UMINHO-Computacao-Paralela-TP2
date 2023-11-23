@@ -429,17 +429,17 @@ double MeanSquaredVelocity() {
     return mean_squared_velocity;
 }
 
-//  Function to calculate the kinetic energy of the system
+// Paralelizado //  Function to calculate the kinetic energy of the system
 double Kinetic() { //Write Function here!  
     
     double kin=0.0;
     
     #pragma omp parallel for reduction(+:kin)
-    for (int i=0; i<N; i++) {
+    for (int i=0; i<N/2; i++) {
         kin += 0.5*m*(v[i][0]*v[i][0])+(v[i][1]*v[i][1])+(v[i][2]*v[i][2]);
         
     }
-    
+    kin=2*kin;
     //printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
     return kin;
     
@@ -488,7 +488,7 @@ void computeAccelerations() {
     
 
     for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
-        #pragma omp parallel for reduction(+:a[:N])
+        #pragma omp parallel for critical
         for (int j = i+1; j < N; j++) {            
             double rSqd = 0;                      
             //  component-by-componenent position of i relative to j

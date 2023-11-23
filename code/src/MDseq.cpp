@@ -429,24 +429,24 @@ double MeanSquaredVelocity() {
     return mean_squared_velocity;
 }
 
-//  Function to calculate the kinetic energy of the system
+// Paralelizado //  Function to calculate the kinetic energy of the system
 double Kinetic() { //Write Function here!  
     
     double kin=0.0;
     
     #pragma omp parallel for reduction(+:kin)
-    for (int i=0; i<N; i++) {
+    for (int i=0; i<N/2; i++) {
         kin += 0.5*m*(v[i][0]*v[i][0])+(v[i][1]*v[i][1])+(v[i][2]*v[i][2]);
         
     }
-    
+    kin=2*kin;
     //printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
     return kin;
     
 }
 
 
-// Function to calculate the potential energy of the system
+// Paralelizado // Function to calculate the potential energy of the system
 double Potential() {
     double Pot =0.0;
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
@@ -488,6 +488,7 @@ void computeAccelerations() {
     
 
     for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
+        #pragma omp parallel for critical
         for (int j = i+1; j < N; j++) {            
             double rSqd = 0;                      
             //  component-by-componenent position of i relative to j
@@ -581,9 +582,6 @@ void initializeVelocities() {
             vCM[0] += m*v[i][0];
             vCM[1] += m*v[i][1];
             vCM[2] += m*v[i][2];
-
-
-
     }
     
     // Vcm = sum_i^N  m*v_i/  sum_i^N  M
@@ -601,7 +599,6 @@ void initializeVelocities() {
     //  not drift in space!
     for (i=0; i<N; i++) {
         
-            
             v[i][0] -= vCM[0];
             v[i][1] -= vCM[1];
             v[i][2] -= vCM[2];
@@ -613,25 +610,17 @@ void initializeVelocities() {
     double vSqdSum, lambda;
     vSqdSum=0.;
     for (i=0; i<N; i++) {
-        
-            
             vSqdSum += v[i][0]*v[i][0];
             vSqdSum += v[i][1]*v[i][1];
             vSqdSum += v[i][2]*v[i][2];
-            
-        
     }
     
     lambda = sqrt( 3*(N-1)*Tinit/vSqdSum);
     
     for (i=0; i<N; i++) {
-        
-            
             v[i][0] *= lambda;
             v[i][1] *= lambda;
             v[i][2] *= lambda;
-            
-        
     }
 }
 
