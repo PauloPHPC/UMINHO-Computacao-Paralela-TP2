@@ -1,13 +1,14 @@
 #!/bin/bash
-#SBATCH --time=10:00
+#SBATCH --time=00:10:00
 #SBATCH --ntasks=40
 #SBATCH --partition=cpar
 #SBATCH --exclusive
 
-THREADS="1 2 4 8 12 16 20 24 28 32 36 40"
+THREADS=(1 2 4 8 12 16 20 24 28 32 36 40)
 
-for thread in $THREADS; do
-    export OMP_NUM_THREADS=$thread
+for thread in "${THREADS[@]}" 
+do
+    export OMP_NUM_THREADS=${thread}
     echo ${OMP_NUM_THREADS}
-    time ./MDpar.exe < inputdata.txt
+    time ./MDpar.exe < inputdata.txt 
 done
