@@ -434,7 +434,7 @@ double Kinetic() { //Write Function here!
     
     double kin=0.0;
     
-    #pragma omp parallel for reduction(+:kin)
+    #pragma omp simd reduction(+:kin)
     for (int i=0; i<N/2; i++) {
         kin += 0.5*m*(v[i][0]*v[i][0])+(v[i][1]*v[i][1])+(v[i][2]*v[i][2]);
         
@@ -452,7 +452,7 @@ double Potential() {
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
  
     for (int i=0; i<N/2; i++) {
-        #pragma omp parallel for reduction(+:Pot)
+        #pragma omp simd reduction(+:Pot)
         for (int j=0; j<N/2; j++) {
             
             if (j!=i) {
@@ -478,7 +478,7 @@ double Potential() {
 //   accelleration of each atom. 
 void computeAccelerations() {
   
-    double rij[3]; // position of i relative to j
+     
      #pragma omp parallel for
     for (int i = 0; i < N; i++) {  // set all accelerations to zero
         a[i][0]=0;
@@ -486,28 +486,29 @@ void computeAccelerations() {
         a[i][2]=0;        
     }
     
-
+    #pragma omp critical
     for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
-        #pragma omp parallel for critical
+        
         for (int j = i+1; j < N; j++) {            
             double rSqd = 0;                      
             //  component-by-componenent position of i relative to j
-            rij[0] = r[i][0] - r[j][0];
-            rij[1] = r[i][1] - r[j][1];
-            rij[2] = r[i][2] - r[j][2];
+            double r0 = r[i][0] - r[j][0];
+            double r1 = r[i][1] - r[j][1];
+            double r2 = r[i][2] - r[j][2];
             //  sum of squares of the components
-            rSqd = (rij[0] * rij[0])+(rij[1] * rij[1])+(rij[2] * rij[2]);
+            rSqd = (r0 * r0)+(r1 * r1)+(r2 * r2);
             double div=1/rSqd;
             double p4=div*div*div*div;
+            double p7=(p4*div*div*div);
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-           double f = (48*p4*div*div*div) - (24*p4);
+           double f = 24*((2*p7) - (p4));
                 //  from F = ma, where m = 1 in natural units!                
-                a[i][0] += f*rij[0];
-                a[i][1] += f*rij[1];
-                a[i][2] += f*rij[2];
-                a[j][0] -= f*rij[0];
-                a[j][1] -= f*rij[1];
-                a[j][2] -= f*rij[2];
+                a[i][0] += f*r0;
+                a[i][1] += f*r1;
+                a[i][2] += f*r2;
+                a[j][0] -= f*r0;
+                a[j][1] -= f*r1;
+                a[j][2] -= f*r2;
             
         }
     }
@@ -523,6 +524,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     //computeAccelerations();
     //  Update positions and velocity with current velocity and acceleration
     //printf("  Updated Positions!\n");
+    
     #pragma omp critical
     for (int i=0; i<N; i++) {
 
@@ -572,6 +574,7 @@ void initializeVelocities() {
     int i;
     
     double vCM[3] = {0, 0, 0};
+    
    
     #pragma omp critical
     for (i=0; i<N; i++) {
@@ -598,21 +601,18 @@ void initializeVelocities() {
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
     for (i=0; i<N; i++) {
-        
             v[i][0] -= vCM[0];
             v[i][1] -= vCM[1];
             v[i][2] -= vCM[2];
-        
     }
     
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum=0.;
+    #pragma omp simd reduction(+:vSqdSum)
     for (i=0; i<N; i++) {
-            vSqdSum += v[i][0]*v[i][0];
-            vSqdSum += v[i][1]*v[i][1];
-            vSqdSum += v[i][2]*v[i][2];
+            vSqdSum += v[i][0]*v[i][0] +v[i][1]*v[i][1] +v[i][2]*v[i][2];
     }
     
     lambda = sqrt( 3*(N-1)*Tinit/vSqdSum);
