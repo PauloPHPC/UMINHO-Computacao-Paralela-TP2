@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=10:00
-#SBATCH --ntask=40
+#SBATCH --ntasks=40
 #SBATCH --partition=cpar
 #SBATCH --exclusive
 
