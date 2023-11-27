@@ -44,6 +44,7 @@ double kBSI = 1.38064852e-23;  // m^2*kg/(s^2*K)
 
 //  Size of box, which will be specified in natural units
 double L;
+double Pot=0;
 
 //  Initial Temperature in Natural Units
 double Tinit;  //2;
@@ -76,7 +77,7 @@ double gaussdist();
 //  Initialize velocities according to user-supplied initial Temperature (Tinit)
 void initializeVelocities();
 //  Compute total potential energy from particle coordinates
-double Potential();
+//double Potential();
 //  Compute mean squared velocity from particle velocities
 double MeanSquaredVelocity();
 //  Compute total kinetic energy from particle mass and velocities
@@ -312,7 +313,7 @@ int main()
         //  We would also like to use the IGL to try to see if we can extract the gas constant
         mvs = MeanSquaredVelocity();
         KE = Kinetic();
-        PE = Potential();
+        PE = Pot;
         
         // Temperature from Kinetic Theory
         Temp = m*mvs/(3*kB) * TempFac;
@@ -429,17 +430,17 @@ double MeanSquaredVelocity() {
     return mean_squared_velocity;
 }
 
-//  Function to calculate the kinetic energy of the system
+// Paralelizado //  Function to calculate the kinetic energy of the system
 double Kinetic() { //Write Function here!  
     
     double kin=0.0;
     
-    #pragma omp parallel for reduction(+:kin)
-    for (int i=0; i<N; i++) {
+    #pragma omp simd reduction(+:kin)
+    for (int i=0; i<N/2; i++) {
         kin += 0.5*m*(v[i][0]*v[i][0])+(v[i][1]*v[i][1])+(v[i][2]*v[i][2]);
         
     }
-    
+    kin=2*kin;
     //printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
     return kin;
     
@@ -447,12 +448,12 @@ double Kinetic() { //Write Function here!
 
 
 // Paralelizado // Function to calculate the potential energy of the system
-double Potential() {
+/*double Potential() {
     double Pot =0.0;
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
  
     for (int i=0; i<N/2; i++) {
-        #pragma omp parallel for reduction(+:Pot)
+        #pragma omp simd reduction(+:Pot)
         for (int j=0; j<N/2; j++) {
             
             if (j!=i) {
@@ -469,16 +470,17 @@ double Potential() {
     }
     Pot=2*Pot;
     return Pot;
-}
+}*/
 
 
 
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the
-//   accelleration of each atom. 
+//paralelizado //   accelleration of each atom. 
 void computeAccelerations() {
-  
-    double rij[3]; // position of i relative to j
+  double Pot=0;
+  double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
+     
      #pragma omp parallel for
     for (int i = 0; i < N; i++) {  // set all accelerations to zero
         a[i][0]=0;
@@ -486,34 +488,45 @@ void computeAccelerations() {
         a[i][2]=0;        
     }
     
-
+    #pragma omp critical
     for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
-        #pragma omp parallel for reduction(+:a[:N])
+        
         for (int j = i+1; j < N; j++) {            
             double rSqd = 0;                      
             //  component-by-componenent position of i relative to j
-            rij[0] = r[i][0] - r[j][0];
-            rij[1] = r[i][1] - r[j][1];
-            rij[2] = r[i][2] - r[j][2];
+            double r0 = r[i][0] - r[j][0];
+            double r1 = r[i][1] - r[j][1];
+            double r2 = r[i][2] - r[j][2];
             //  sum of squares of the components
-            rSqd = (rij[0] * rij[0])+(rij[1] * rij[1])+(rij[2] * rij[2]);
+            rSqd = (r0 * r0)+(r1 * r1)+(r2 * r2);
             double div=1/rSqd;
+
+            double r6 = div*div*div;
+
+
+            double term = sigma6 * r6 * (sigma6*r6- 1.0);
+            Pot +=  4.0 * epsilon * term;
+
+
+
             double p4=div*div*div*div;
+            double p7=(p4*p4*rSqd);
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-           double f = (48*p4*div*div*div) - (24*p4);
+           double f = 24*((2*p7) - (p4));
                 //  from F = ma, where m = 1 in natural units!                
-                a[i][0] += f*rij[0];
-                a[i][1] += f*rij[1];
-                a[i][2] += f*rij[2];
-                a[j][0] -= f*rij[0];
-                a[j][1] -= f*rij[1];
-                a[j][2] -= f*rij[2];
+                
+                a[i][0] += f*r0;
+                a[i][1] += f*r1;
+                a[i][2] += f*r2;
+                a[j][0] -= f*r0;
+                a[j][1] -= f*r1;
+                a[j][2] -= f*r2;
             
         }
     }
 }
 
-// returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
+//paralelizado // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
 double VelocityVerlet(double dt, int iter, FILE *fp) {
     double c=0.5*dt;    
     double psum = 0.;
@@ -523,6 +536,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     //computeAccelerations();
     //  Update positions and velocity with current velocity and acceleration
     //printf("  Updated Positions!\n");
+    
     #pragma omp critical
     for (int i=0; i<N; i++) {
 
@@ -572,6 +586,7 @@ void initializeVelocities() {
     int i;
     
     double vCM[3] = {0, 0, 0};
+    
    
     #pragma omp critical
     for (i=0; i<N; i++) {
@@ -597,26 +612,24 @@ void initializeVelocities() {
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
+    #pragma omp critical
     for (i=0; i<N; i++) {
-        
             v[i][0] -= vCM[0];
             v[i][1] -= vCM[1];
             v[i][2] -= vCM[2];
-        
     }
     
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum=0.;
+    #pragma omp simd reduction(+:vSqdSum)
     for (i=0; i<N; i++) {
-            vSqdSum += v[i][0]*v[i][0];
-            vSqdSum += v[i][1]*v[i][1];
-            vSqdSum += v[i][2]*v[i][2];
+            vSqdSum += v[i][0]*v[i][0] +v[i][1]*v[i][1] +v[i][2]*v[i][2];
     }
     
     lambda = sqrt( 3*(N-1)*Tinit/vSqdSum);
-    
+    #pragma omp parallel for
     for (i=0; i<N; i++) {
             v[i][0] *= lambda;
             v[i][1] *= lambda;
