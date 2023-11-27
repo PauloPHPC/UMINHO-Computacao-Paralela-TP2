@@ -44,6 +44,7 @@ double kBSI = 1.38064852e-23;  // m^2*kg/(s^2*K)
 
 //  Size of box, which will be specified in natural units
 double L;
+double Pot=0;
 
 //  Initial Temperature in Natural Units
 double Tinit;  //2;
@@ -76,7 +77,7 @@ double gaussdist();
 //  Initialize velocities according to user-supplied initial Temperature (Tinit)
 void initializeVelocities();
 //  Compute total potential energy from particle coordinates
-double Potential();
+//double Potential();
 //  Compute mean squared velocity from particle velocities
 double MeanSquaredVelocity();
 //  Compute total kinetic energy from particle mass and velocities
@@ -312,7 +313,7 @@ int main()
         //  We would also like to use the IGL to try to see if we can extract the gas constant
         mvs = MeanSquaredVelocity();
         KE = Kinetic();
-        PE = Potential();
+        PE = Pot;
         
         // Temperature from Kinetic Theory
         Temp = m*mvs/(3*kB) * TempFac;
@@ -447,7 +448,7 @@ double Kinetic() { //Write Function here!
 
 
 // Paralelizado // Function to calculate the potential energy of the system
-double Potential() {
+/*double Potential() {
     double Pot =0.0;
     double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
  
@@ -469,7 +470,7 @@ double Potential() {
     }
     Pot=2*Pot;
     return Pot;
-}
+}*/
 
 
 
@@ -477,7 +478,8 @@ double Potential() {
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //paralelizado //   accelleration of each atom. 
 void computeAccelerations() {
-  
+  double Pot=0;
+  double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
      
      #pragma omp parallel for
     for (int i = 0; i < N; i++) {  // set all accelerations to zero
@@ -498,11 +500,21 @@ void computeAccelerations() {
             //  sum of squares of the components
             rSqd = (r0 * r0)+(r1 * r1)+(r2 * r2);
             double div=1/rSqd;
+
+            double r6 = div*div*div;
+
+
+            double term = sigma6 * r6 * (sigma6*r6- 1.0);
+            Pot +=  4.0 * epsilon * term;
+
+
+
             double p4=div*div*div*div;
-            double p7=(p4*div*div*div);
+            double p7=(p4*p4*rSqd);
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
            double f = 24*((2*p7) - (p4));
                 //  from F = ma, where m = 1 in natural units!                
+                
                 a[i][0] += f*r0;
                 a[i][1] += f*r1;
                 a[i][2] += f*r2;
