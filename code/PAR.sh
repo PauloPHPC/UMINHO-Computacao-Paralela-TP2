@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=00:10:00
-#SBATCH --ntasks=40
+#SBATCH --cpus-per-task=40
 #SBATCH --partition=cpar
 #SBATCH --exclusive
 
