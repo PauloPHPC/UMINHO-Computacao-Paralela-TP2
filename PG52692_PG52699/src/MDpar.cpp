@@ -28,6 +28,8 @@
 #include<math.h>
 #include<string.h>
 #include<omp.h>
+#include<immintrin.h>
+
 
 
 // Number of particles

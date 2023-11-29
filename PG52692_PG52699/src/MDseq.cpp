@@ -27,7 +27,7 @@
 #include<stdlib.h>
 #include<math.h>
 #include<string.h>
-#include<omp.h>
+
 
 
 // Number of particles
@@ -377,7 +377,7 @@ void initialize() {
     //  index for number of particles assigned positions
     p = 0;
     //  initialize positions
-    #pragma omp critical
+    
     for (i=0; i<n; i++) {
         for (j=0; j<n; j++) {
             for (k=0; k<n; k++) {
@@ -417,7 +417,7 @@ void initialize() {
 double MeanSquaredVelocity() { 
     
     double v2_sum = 0.0;
-    #pragma omp critical
+    
     for (int i = 0; i < N; i++) {
         double v2 = 0.0;
         for (int j = 0; j < 3; j++) {
@@ -435,7 +435,7 @@ double Kinetic() { //Write Function here!
     
     double kin=0.0;
     
-    #pragma omp simd reduction(+:kin)
+    
     for (int i=0; i<N/2; i++) {
         kin += 0.5*m*(v[i][0]*v[i][0])+(v[i][1]*v[i][1])+(v[i][2]*v[i][2]);
         
@@ -481,14 +481,14 @@ void computeAccelerations() {
   double Pot=0;
   double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
      
-     #pragma omp parallel for
+    
     for (int i = 0; i < N; i++) {  // set all accelerations to zero
         a[i][0]=0;
         a[i][1]=0;
         a[i][2]=0;        
     }
     
-    #pragma omp critical
+    
     for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
         
         for (int j = i+1; j < N; j++) {            
@@ -537,7 +537,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     //  Update positions and velocity with current velocity and acceleration
     //printf("  Updated Positions!\n");
     
-    #pragma omp critical
+    
     for (int i=0; i<N; i++) {
 
             
@@ -557,7 +557,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     //  Update accellerations from updated positions
     computeAccelerations();
     //  Update velocity with updated acceleration
-    #pragma omp critical
+    
     for (int i=0; i<N; i++) {
         
             v[i][0] += c*a[i][0];
@@ -588,7 +588,7 @@ void initializeVelocities() {
     double vCM[3] = {0, 0, 0};
     
    
-    #pragma omp critical
+    
     for (i=0; i<N; i++) {
             //  Pull a number from a Gaussian Distribution
             v[i][0] = gaussdist();
@@ -612,7 +612,7 @@ void initializeVelocities() {
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
-    #pragma omp critical
+    
     for (i=0; i<N; i++) {
             v[i][0] -= vCM[0];
             v[i][1] -= vCM[1];
@@ -623,13 +623,13 @@ void initializeVelocities() {
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum=0.;
-    #pragma omp simd reduction(+:vSqdSum)
+    
     for (i=0; i<N; i++) {
             vSqdSum += v[i][0]*v[i][0] +v[i][1]*v[i][1] +v[i][2]*v[i][2];
     }
     
     lambda = sqrt( 3*(N-1)*Tinit/vSqdSum);
-    #pragma omp parallel for
+    
     for (i=0; i<N; i++) {
             v[i][0] *= lambda;
             v[i][1] *= lambda;
