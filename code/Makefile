@@ -21,12 +21,6 @@ runseq: MDseq.exe
 	./MDseq.exe < inputdata.txt
 
 runpar: MDpar.exe
-	export OMP_NUM_THREADS=2;\
+	export OMP_NUM_THREADS=16;\
 	./MDpar.exe < inputdata.txt
-
-testpar:
-	sbatch ./PAR.sh
-
-testseq:
-	sbatch ./SEQ.sh
 
