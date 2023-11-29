@@ -30,6 +30,7 @@
 #include<omp.h>
 
 
+
 // Number of particles
 int N;
 
