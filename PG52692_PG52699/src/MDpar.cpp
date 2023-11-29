@@ -28,7 +28,8 @@
 #include<math.h>
 #include<string.h>
 #include<omp.h>
-#include<immintrin.h>
+#include <immintrin.h>
+
 
 
 
@@ -379,7 +380,7 @@ void initialize() {
     //  index for number of particles assigned positions
     p = 0;
     //  initialize positions
-    #pragma omp critical
+    
     for (i=0; i<n; i++) {
         for (j=0; j<n; j++) {
             for (k=0; k<n; k++) {
@@ -419,7 +420,7 @@ void initialize() {
 double MeanSquaredVelocity() { 
     
     double v2_sum = 0.0;
-    #pragma omp critical
+    
     for (int i = 0; i < N; i++) {
         double v2 = 0.0;
         for (int j = 0; j < 3; j++) {
@@ -437,7 +438,7 @@ double Kinetic() { //Write Function here!
     
     double kin=0.0;
     
-    #pragma omp simd reduction(+:kin)
+    
     for (int i=0; i<N/2; i++) {
         kin += 0.5*m*(v[i][0]*v[i][0])+(v[i][1]*v[i][1])+(v[i][2]*v[i][2]);
         
@@ -480,52 +481,77 @@ double Kinetic() { //Write Function here!
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //paralelizado //   accelleration of each atom. 
 void computeAccelerations() {
-  double Pot=0;
+
+    double b[MAXPART][3];
+    Pot=0.;
   double sigma6=sigma*sigma*sigma*sigma*sigma*sigma;
-     
-     #pragma omp parallel for
-    for (int i = 0; i < N; i++) {  // set all accelerations to zero
-        a[i][0]=0;
-        a[i][1]=0;
-        a[i][2]=0;        
-    }
-    
-    #pragma omp critical
-    for (int i = 0; i < N-1; i++) {   // loop over all distinct pairs i,j
+  
+
+    for (int i = 0; i < N; i++)
+    { // set all accelerations to zero
         
-        for (int j = i+1; j < N; j++) {            
-            double rSqd = 0;                      
-            //  component-by-componenent position of i relative to j
-            double r0 = r[i][0] - r[j][0];
-            double r1 = r[i][1] - r[j][1];
-            double r2 = r[i][2] - r[j][2];
-            //  sum of squares of the components
-            rSqd = (r0 * r0)+(r1 * r1)+(r2 * r2);
-            double div=1/rSqd;
+            a[i][0] = 0;
+            b[i][0] = 0;
 
-            double r6 = div*div*div;
+            a[i][1] = 0;
+            b[i][1] = 0;
 
+            a[i][2] = 0;
+            b[i][2] = 0;
+        
+    }
+    #pragma omp parallel firstprivate(b)
+    {
+        #pragma omp for reduction(+:Pot)
+        for (int i = 0; i < N - 1; i++)
+        { // loop over all distinct pairs i,j
+            
+            double f, r2, term1, term2, rSqd;
+            double rij[3]; // position of i relative to j
+            for (int j = i + 1; j < N; j++)
+            {
+                
+                // initialize r^2 to zero
+                rSqd = 0.;
+                
+                
+                #pragma omp simd
+                for (int m = 0; m < 3; m++)
+                {
+                    //  component-by-componenent position of i relative to j
+                    rij[m] = r[i][m] - r[j][m];
+                    //  sum of squares of the components
+                    rSqd += rij[m] * rij[m];
+                }
+                
+                double div=1/rSqd;
 
-            double term = sigma6 * r6 * (sigma6*r6- 1.0);
-            Pot +=  4.0 * epsilon * term;
-
-
-
+                term2 = div * div * div; // pow(quot,6.);
+                term1 = term2 * term2;
+                Pot += 2 * (4 * epsilon * (term1 - term2));
+                //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
             double p4=div*div*div*div;
             double p7=(p4*p4*rSqd);
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-           double f = 24*((2*p7) - (p4));
-                //  from F = ma, where m = 1 in natural units!                
-                
-                a[i][0] += f*r0;
-                a[i][1] += f*r1;
-                a[i][2] += f*r2;
-                a[j][0] -= f*r0;
-                a[j][1] -= f*r1;
-                a[j][2] -= f*r2;
-            
+            double f = 24*((2*p7) - (p4));
+                #pragma omp simd
+                for (int m = 0; m < 3; m++)
+                {
+                    //  from F = ma, where m = 1 in natural units!
+                    b[i][m] += rij[m] * f;
+
+                    b[j][m] -= rij[m] * f;
+                }
+            }
+        }
+        #pragma omp critical
+        {
+            for (int i = 0; i < N; i++)
+                for (int k = 0; k < 3; k++)
+                    a[i][k] += b[i][k];
         }
     }
+
 }
 
 //paralelizado // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
@@ -539,7 +565,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     //  Update positions and velocity with current velocity and acceleration
     //printf("  Updated Positions!\n");
     
-    #pragma omp critical
+    
     for (int i=0; i<N; i++) {
 
             
@@ -559,7 +585,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     //  Update accellerations from updated positions
     computeAccelerations();
     //  Update velocity with updated acceleration
-    #pragma omp critical
+    
     for (int i=0; i<N; i++) {
         
             v[i][0] += c*a[i][0];
@@ -590,7 +616,7 @@ void initializeVelocities() {
     double vCM[3] = {0, 0, 0};
     
    
-    #pragma omp critical
+    
     for (i=0; i<N; i++) {
             //  Pull a number from a Gaussian Distribution
             v[i][0] = gaussdist();
@@ -614,7 +640,7 @@ void initializeVelocities() {
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
-    #pragma omp critical
+   
     for (i=0; i<N; i++) {
             v[i][0] -= vCM[0];
             v[i][1] -= vCM[1];
@@ -625,13 +651,13 @@ void initializeVelocities() {
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum=0.;
-    #pragma omp simd reduction(+:vSqdSum)
+    
     for (i=0; i<N; i++) {
             vSqdSum += v[i][0]*v[i][0] +v[i][1]*v[i][1] +v[i][2]*v[i][2];
     }
     
     lambda = sqrt( 3*(N-1)*Tinit/vSqdSum);
-    #pragma omp parallel for
+    
     for (i=0; i<N; i++) {
             v[i][0] *= lambda;
             v[i][1] *= lambda;
