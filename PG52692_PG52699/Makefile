@@ -1,6 +1,6 @@
 CC = gcc
 SRC = src/
-CFLAGS = -O3
+CFLAGS = -O3 -ftree-vectorize -msse4
 
 .DEFAULT_GOAL = all
 
